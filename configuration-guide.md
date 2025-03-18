@@ -1,70 +1,78 @@
 # K3s Cluster Configuration Guide
 
-## Centralized Configuration
+## Network Configuration
 
-All configuration for the K3s cluster is now centralized in the `config.js` file. This makes it easier to update all settings in one place.
+### Subnet Configuration
+- **Private Network Range**: 10.0.0.0/8 (All internal IPs)
+- **K3s Installation Subnet**: 10.0.0.0/9 (10.0.0.0 to 10.127.255.255)
+- **Jump Host**: 10.128.0.1 (Outside the K3s subnet but within the private network)
 
-## Required Configuration Values
+### Firewall Rules
+The firewall is configured to allow traffic from the entire private network range (10.0.0.0/8) to ensure all nodes can communicate, including the jump host which is outside the K3s subnet.
 
-Open the `config.js` file and update the following sections:
+```bash
+ufw allow ssh
+ufw allow from 10.0.0.0/8
+```
 
-### 1. Network Configuration
-- No changes needed for private subnet and jump host IP unless your network differs from 10.0.0.0/9 and 10.128.0.1
+## Script Roles
 
-### 2. Node IP Addresses
-- Update the IP addresses for all nodes if they differ from the defaults:
-  - Manager nodes (10.0.1.1, 10.0.1.2, 10.0.1.3)
-  - Worker nodes (10.0.2.1, 10.0.2.2)
-  - Database nodes (10.0.3.1, 10.0.3.2)
-  - Messaging nodes (10.0.4.1, 10.0.4.2)
+### setup-k3s-cluster.js
+This script prepares the local environment for deployment:
+- Creates necessary directories (manifests, scripts, configs, certs)
+- Generates SSH keys for node communication
+- Creates installation scripts for different node types
+- Generates Kubernetes manifest files
+- Does NOT actually deploy anything to remote servers
 
-### 3. Storage Configuration
-- Update the Hetzner Storage Box details:
-  ```javascript
-  storageBox: {
-    nfsServer: 'your-storage-box.your-storagebox.de', // Replace with your actual Storage Box hostname
-    nfsPath: '/your-storage-box',                     // Replace with your actual Storage Box path
-    size: '1TB'                                       // Update with your actual storage size
-  }
-  ```
+### deploy-k3s-cluster.js
+This script performs the actual deployment:
+- Configures the jump host as a gateway
+- Deploys K3s to all nodes in the correct order
+- Copies and applies Kubernetes manifests
+- Sets up node labels and taints
+- Retrieves the kubeconfig file
 
-- Update the Object Storage details:
-  ```javascript
-  objectStorage: {
-    endpoint: 's3.hetzner.cloud',                    // Usually stays the same
-    region: 'eu-central-1',                          // Update if using a different region
-    bucketName: 'k3s-cluster-backup',                // Replace with your actual bucket name
-    accessKey: 'your-access-key',                    // Replace with your S3 access key
-    secretKey: 'your-secret-key'                     // Replace with your S3 secret key
-  }
-  ```
+## K3s Installation Parameters
 
-### 4. K3s Configuration
-- Update the K3s token:
-  ```javascript
-  k3s: {
-    version: 'v1.25.6+k3s1',                         // Update if you want a different K3s version
-    token: 'your-secure-k3s-token'                   // Replace with a secure random token
-  }
-  ```
+To restrict K3s to the 10.0.0.0/9 subnet, the following parameters are used in the K3s installation:
 
-### 5. Hetzner API Configuration
-- Add your Hetzner API token and network ID:
-  ```javascript
-  hetzner: {
-    apiToken: 'your-hetzner-api-token',              // Replace with your Hetzner API token
-    networkId: 'your-hetzner-network-id'             // Replace with your Hetzner network ID
-  }
-  ```
+```bash
+# For master nodes
+curl -sfL https://get.k3s.io | sh -s - server \
+  --cluster-cidr=10.0.0.0/9 \
+  --service-cidr=10.96.0.0/12 \
+  ...
 
-## Deployment Process
+# For worker nodes
+curl -sfL https://get.k3s.io | sh -s - agent \
+  ...
+```
 
-1. Update all configuration values in `config.js`
-2. Run the setup script to generate all necessary files:
-   ```
-   ./setup-k3s-cluster.js
-   ```
-3. Run the deployment script to deploy the cluster:
-   ```
-   ./deploy-k3s-cluster.js
-   ```
+The `--cluster-cidr` parameter restricts the pod network to the specified subnet.
+
+## Node Types and Roles
+
+1. **Manager Nodes** (10.0.1.x):
+   - Run the K3s server component
+   - Form the control plane
+   - First manager initializes the cluster
+   - Additional managers join the existing cluster
+
+2. **Worker Nodes** (10.0.2.x):
+   - Run the K3s agent component
+   - Execute general workloads
+
+3. **Database Nodes** (10.0.3.x):
+   - Specialized worker nodes
+   - Tainted to only run database workloads
+   - Higher resource allocation (8GB RAM, 4 vCPU)
+
+4. **Messaging Nodes** (10.0.4.x):
+   - Specialized worker nodes
+   - Tainted to only run messaging workloads
+
+5. **Jump Host** (10.128.0.1):
+   - Gateway to the cluster
+   - Provides NAT for outbound traffic
+   - Only node with public IP

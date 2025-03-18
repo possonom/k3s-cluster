@@ -1,9 +1,10 @@
 // K3s Cluster Configuration
 module.exports = {
   network: {
-    privateSubnet: '10.0.0.0/9',
+    privateSubnet: '10.0.0.0/8',  // Full private network range
+    k3sSubnet: '10.0.0.0/9',      // K3s specific subnet
     jumpHost: {
-      ip: '10.128.0.1',
+      ip: '10.128.0.1',           // Outside K3s subnet but within private network
     }
   },
   nodes: {

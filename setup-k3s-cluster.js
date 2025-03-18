@@ -47,7 +47,7 @@ apt-get install -y curl wget vim htop iptables nfs-common
 
 # Set up firewall
 ufw allow ssh
-ufw allow from 10.0.0.0/9
+ufw allow from 10.0.0.0/8
 ufw --force enable
 
 # Configure sysctl for Kubernetes
@@ -97,6 +97,8 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${config.k3s.version}" sh -s
   --flannel-iface=eth1 \\
   --disable=traefik \\
   --disable=servicelb \\
+  --cluster-cidr=10.0.0.0/9 \\
+  --service-cidr=10.96.0.0/12 \\
   --cluster-init
 
 # Wait for K3s to be ready
@@ -122,6 +124,8 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${config.k3s.version}" sh -s
   --flannel-iface=eth1 \\
   --disable=traefik \\
   --disable=servicelb \\
+  --cluster-cidr=10.0.0.0/9 \\
+  --service-cidr=10.96.0.0/12 \\
   --server https://10.0.1.1:6443
 
 # Wait for K3s to be ready
