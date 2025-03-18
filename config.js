@@ -30,7 +30,9 @@ module.exports = {
     storageBox: {
       nfsServer: 'your-storage-box.your-storagebox.de',
       nfsPath: '/your-storage-box',
-      size: '1TB'
+      size: '1TB',
+      username: 'your-storage-box-username',
+      password: 'your-storage-box-password'
     },
     objectStorage: {
       endpoint: 's3.hetzner.cloud',
